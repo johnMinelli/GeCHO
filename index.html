@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="description" content="GeCHO: Generation of Contextualized Human–Object Interactions. An inpainting approach combining ControlNet and LoRA fine-tuning for realistic HOI synthesis.">
+  <meta property="og:title" content="GeCHO: Generation of Contextualized Human–Object Interactions"/>
+  <meta property="og:description" content="An inpainting approach that generates spatially consistent, contextually-aware human-object interactions using ControlNet and attention-guided free-form masking."/>
+  <meta property="og:url" content="https://johnminelli.github.io/gecho"/>
+  <meta property="og:image" content="static/images/teaser_low_q.jpg"/>
+  <meta property="og:image:width" content="1200"/>
+  <meta property="og:image:height" content="630"/>
+  <meta name="twitter:title" content="GeCHO: Generation of Contextualized Human–Object Interactions">
+  <meta name="twitter:description" content="Text-guided inpainting for realistic human-object interaction synthesis.">
+  <meta name="twitter:image" content="static/images/teaser_low_q.jpg">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="keywords" content="diffusion models, human-object interaction, inpainting, ControlNet, LoRA, synthetic data, HOI detection">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>GeCHO: Generation of Contextualized Human–Object Interactions</title>
+  <link rel="icon" type="image/x-icon" href="static/images/icon.svg">
+  <link href="https://fonts.googleapis.com/css?family=Google+Sans|Noto+Sans|Castoro" rel="stylesheet">
+  <link rel="stylesheet" href="static/css/bulma.min.css">
+  <link rel="stylesheet" href="static/css/bulma-carousel.min.css">
+  <link rel="stylesheet" href="static/css/bulma-slider.min.css">
+  <link rel="stylesheet" href="static/css/fontawesome.all.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
+  <link rel="stylesheet" href="static/css/index.css">
+
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <script defer src="static/js/fontawesome.all.min.js"></script>
+  <script src="static/js/bulma-carousel.min.js"></script>
+  <script src="static/js/bulma-slider.min.js"></script>
+  <script src="static/js/index.js"></script>
+
+  <style>
+    /* ── extra overrides ── */
+    .hero.is-dark-gradient {
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    }
+    .section-divider {
+      border: none;
+      border-top: 1px solid #e5e5e5;
+      margin: 0;
+    }
+    .method-icon {
+      font-size: 2rem;
+      margin-bottom: .5rem;
+      color: #3273dc;
+    }
+    .comparison-label {
+      font-weight: 700;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #555;
+      text-align: center;
+      padding: 4px 0;
+    }
+    .comparison-label.ours {
+      color: #23d160;
+    }
+    .comparison-grid {
+      display: grid;
+      gap: 4px;
+      align-items: start;
+    }
+    .comparison-grid img {
+      width: 100%;
+      border-radius: 4px;
+      display: block;
+    }
+    .interaction-tag {
+      font-size: 0.72rem;
+      font-style: italic;
+      color: #666;
+      text-align: center;
+      margin-top: 2px;
+    }
+    .result-row {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 16px;
+      align-items: flex-start;
+    }
+    .result-row .row-label {
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: #444;
+      white-space: nowrap;
+      align-self: center;
+      min-width: 18px;
+    }
+    .result-row .col {
+      flex: 1;
+    }
+    .col-header {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-align: center;
+      color: #555;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 4px;
+      border-bottom: 2px solid #eee;
+      padding-bottom: 3px;
+    }
+    .col-header.ours-header {
+      color: #23d160;
+      border-bottom-color: #23d160;
+    }
+    .quant-table {
+      font-size: 0.88rem;
+    }
+    .quant-table th {
+      background: #f5f5f5;
+      font-weight: 700;
+    }
+    .quant-table .best {
+      font-weight: 700;
+      color: #23d160;
+    }
+    .quant-table .ours-row {
+      background: #f0faf3;
+    }
+    .author-card {
+      text-align: center;
+    }
+    .author-card img {
+      width: 90px;
+      height: 90px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 3px solid #dbdbdb;
+      margin-bottom: .5rem;
+    }
+    .author-card .author-name {
+      font-weight: 700;
+      font-size: 0.95rem;
+    }
+    .author-card .author-aff {
+      font-size: 0.8rem;
+      color: #777;
+    }
+    .venue-badge {
+      display: inline-block;
+      background: #3273dc;
+      color: white;
+      padding: 3px 14px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-top: 8px;
+    }
+    .section-heading {
+      border-left: 4px solid #3273dc;
+      padding-left: 12px;
+      margin-bottom: 1.5rem;
+    }
+    pre code {
+      font-size: 0.82rem;
+      white-space: pre-wrap;
+    }
+    .pill-tag {
+      display: inline-block;
+      background: #eef3ff;
+      color: #3273dc;
+      border-radius: 12px;
+      padding: 2px 10px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      margin: 2px;
+    }
+  </style>
+</head>
+<body>
+
+
+<!-- ══════════════════════════════════════════════
+     HERO / TITLE
+══════════════════════════════════════════════ -->
+<section class="hero">
+  <div class="hero-body">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered">
+        <div class="column has-text-centered">
+          <h1 class="title is-1 publication-title">
+            <img src="static/images/icon.svg" alt="GeCHO icon" style="height:80px;vertical-align:middle;margin-right:8px;margin-top:-12px;">
+            GeCHO
+          </h1>
+          <h2 class="title is-3 publication-title" style="margin-top:-0.5rem;">
+            Generation of Contextualized Human–Object Interactions
+          </h2>
+
+          <div style="margin-top:0.5rem;">
+            <span class="venue-badge">IEEE Access 2026</span>
+          </div>
+
+          <!-- Authors -->
+          <div class="is-size-5 publication-authors" style="margin-top:1.2rem;">
+            <span class="author-block">
+              <a href="https://github.com/johnMinelli" target="_blank">Giovanni Minelli</a><sup>1,3</sup>,&nbsp;
+            </span>
+            <span class="author-block">
+              Andrea Benericetti<sup>2</sup>,&nbsp;
+            </span>
+            <span class="author-block">
+              <a href="https://leotac.github.io/" target="_blank">Leonardo Taccari</a><sup>2</sup>,&nbsp;
+            </span>
+            <span class="author-block">
+              Francesco Sambo<sup>2</sup>,&nbsp;
+            </span>
+            <span class="author-block">
+              <a href="https://www.unibo.it/sitoweb/samuele.salti" target="_blank">Samuele Salti</a><sup>3</sup>
+            </span>
+          </div>
+
+          <!-- Affiliations -->
+          <div class="is-size-6 publication-authors" style="margin-top:.6rem; color:#555;">
+            <span><sup>1</sup>Istituto Italiano di Tecnologia</span>&emsp;
+            <span><sup>2</sup>Verizon Connect, Florence</span>&emsp;
+            <span><sup>3</sup>University of Bologna</span>
+          </div>
+
+          <!-- Links -->
+          <div class="column has-text-centered" style="margin-top:1.2rem;">
+            <div class="publication-links">
+              <span class="link-block">
+                <a href="https://doi.org/10.1109/ACCESS.2026.3678513" target="_blank"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon"><i class="fas fa-file-pdf"></i></span>
+                  <span>Paper</span>
+                </a>
+              </span>
+              <span class="link-block">
+                <a href="static/pdfs/sample.pdf" target="_blank"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon"><i class="fas fa-file-pdf"></i></span>
+                  <span>Supplementary</span>
+                </a>
+              </span>
+              <span class="link-block">
+                <a href="https://github.com/johnMinelli/ContextualInpaint" target="_blank"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon"><i class="fab fa-github"></i></span>
+                  <span>Code</span>
+                </a>
+              </span>
+            </div>
+          </div>
+
+          <!-- Keywords -->
+          <div style="margin-top:0.5rem;">
+            <span class="pill-tag">Diffusion Models</span>
+            <span class="pill-tag">Human-Object Interaction</span>
+            <span class="pill-tag">Inpainting</span>
+            <span class="pill-tag">ControlNet</span>
+            <span class="pill-tag">LoRA</span>
+            <span class="pill-tag">Synthetic Data</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════
+     TEASER
+══════════════════════════════════════════════ -->
+<section class="hero teaser">
+  <div class="container is-max-desktop">
+    <div class="hero-body">
+      <img src="static/images/teaser_low_q.jpg" alt="GeCHO Teaser" style="width:100%;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.12);">
+      <h2 class="subtitle has-text-centered" style="margin-top:1rem;">
+        GeCHO enables natural <strong>human-object interaction synthesis through text-guided inpainting</strong>.
+        Left: visualization of inpainting regions (red = free-form, green = object-mask) and corresponding interaction prompts.
+        Right: outputs demonstrating realistic, coherent interaction scenes produced by our method.
+      </h2>
+    </div>
+  </div>
+</section>
+
+<hr class="section-divider">
+
+
+<!-- ══════════════════════════════════════════════
+     ABSTRACT
+══════════════════════════════════════════════ -->
+<section class="section hero is-light">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-four-fifths">
+        <h2 class="title is-3">Abstract</h2>
+        <div class="content has-text-justified">
+          <p>
+            Creating realistic human-world interactions with diffusion models remains a key challenge, often requiring
+            tedious trial-and-error processes and iterative manual refinements. Current approaches either fail to
+            seamlessly integrate new content while maintaining global scene consistency, or require time-consuming
+            editing and prompt engineering, making the process impractical for large-scale applications.
+          </p>
+          <p>
+            To address this challenge, we propose <strong>GeCHO</strong>, an inpainting framework specifically
+            architected to <strong>generate spatially consistent and contextually-aware human-object interactions</strong>.
+            Our method improves local object fidelity and global scene consistency by leveraging cross-attention maps
+            for automated, annotation-free object placement and using ControlNet to ensure precise spatial localization.
+          </p>
+          <p>
+            We demonstrate the practical impact of our approach through two key applications: <em>natural image
+            inpainting</em>, where we achieve contextual object placement with flexible spatial control, and
+            <em>human-object interaction (HOI) detection</em>, where we address long-tail distributions through
+            synthetic data generation. Our results show that GeCHO achieves <strong>35.50% top-1 zero-shot action
+            recognition accuracy</strong>, outperforming the strong Add-SD baseline (28.14%), confirming its superior
+            ability to synthesize coherent interactions rather than simple isolated objects.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="section-divider">
+
+
+<!-- ══════════════════════════════════════════════
+     METHOD
+══════════════════════════════════════════════ -->
+<section class="section">
+  <div class="container is-max-desktop">
+    <h2 class="title is-3 section-heading">Method</h2>
+
+    <!-- Pipeline figure -->
+    <figure class="image" style="margin-bottom:2rem;">
+      <img src="static/images/pipeline.png" alt="GeCHO pipeline overview"
+           style="border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,.1);">
+    </figure>
+    <p class="has-text-centered is-size-7" style="color:#777;margin-top:-1rem;margin-bottom:2rem;">
+      <strong>Fig. 1.</strong> Overview of the GeCHO framework. (Top) Two-stage training: (I) ControlNet training for object inpainting with U-Net frozen,
+      then (II) U-Net LoRA fine-tuning with frozen ControlNet. (Bottom) Two inference modes: (a) user-controlled generation with an explicit object mask
+      <em>M</em><sub>obj</sub>, and (b) free-form generation where <em>M</em><sub>obj</sub> is automatically extracted from cross-attention maps.
+    </p>
+
+    <!-- Three pillars -->
+    <div class="columns is-multiline">
+      <div class="column is-one-third">
+        <div class="box" style="height:100%;">
+          <p class="method-icon has-text-centered"><i class="fas fa-sliders-h"></i></p>
+          <h3 class="title is-5 has-text-centered">ControlNet for Object Placement</h3>
+          <p class="is-size-6">
+            We train a dedicated ControlNet — a frozen-backbone copy of the inpainting U-Net — specifically for
+            object generation. It receives a binary object mask <em>M</em><sub>obj</sub> as spatial conditioning
+            and a dedicated text prompt, allowing fine-grained control over where the object appears while the base
+            U-Net maintains overall scene coherence.
+          </p>
+        </div>
+      </div>
+
+      <div class="column is-one-third">
+        <div class="box" style="height:100%;">
+          <p class="method-icon has-text-centered"><i class="fas fa-microchip"></i></p>
+          <h3 class="title is-5 has-text-centered">LoRA Fine-Tuning for Harmonization</h3>
+          <p class="is-size-6">
+            Combining the ControlNet with the U-Net introduces domain shifts and morphing artifacts. We apply
+            parameter-efficient LoRA fine-tuning <em>only</em> on the ResNet convolutional blocks — where
+            ControlNet outputs and skip connections are merged — eliminating these inconsistencies while
+            preserving general inpainting capability.
+          </p>
+        </div>
+      </div>
+
+      <div class="column is-one-third">
+        <div class="box" style="height:100%;">
+          <p class="method-icon has-text-centered"><i class="fas fa-magic"></i></p>
+          <h3 class="title is-5 has-text-centered">Attention-Guided Free-Form Masking</h3>
+          <p class="is-size-6">
+            When no explicit object mask is provided, we extract and threshold cross-attention maps from the U-Net
+            to dynamically derive <em>M</em><sub>obj,t</sub> at each denoising step. This enables large-scale
+            automatic HOI synthesis without any mask annotation, while keeping ControlNet and U-Net generation
+            spatially aligned throughout the diffusion process.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="section-divider">
+
+
+<!-- ══════════════════════════════════════════════
+     QUALITATIVE RESULTS — INPAINTING COMPARISON
+══════════════════════════════════════════════ -->
+<section class="section hero is-light">
+  <div class="container is-max-desktop">
+    <h2 class="title is-3 section-heading">Results: Inpainting Comparison</h2>
+    <p class="is-size-6" style="margin-bottom:1.5rem;">
+      We compare against <strong>Paint-By-Example</strong> (image-reference inpainting) and
+      <strong>SD Inpaint</strong> (Stable Diffusion 2.1 inpainting baseline) on object insertion into HICO-DET test
+      scenes. The inpainting mask covers only the object region (<em>M</em> = <em>M</em><sub>obj</sub>).
+    </p>
+
+    <!-- Column headers -->
+    <div style="display:grid;grid-template-columns:2fr 2fr 2fr 2fr;gap:6px;margin-bottom:6px;">
+      <div class="col-header">Input</div>
+      <div class="col-header">Paint-By-Example</div>
+      <div class="col-header">SD Inpaint</div>
+      <div class="col-header ours-header">GeCHO (Ours)</div>
+    </div>
+
+    <!-- Row 1: wield, baseball bat -->
+    <div style="display:grid;grid-template-columns:2fr 2fr 2fr 2fr;gap:6px;margin-bottom:4px;">
+      <img src="static/images/q2/target/HICO_test2015_00000024.jpg" alt="Input" style="width:100%;border-radius:4px;">
+      <img src="static/images/q2/pbe/HICO_test2015_00000024_39.jpg" alt="PBE" style="width:100%;border-radius:4px;">
+      <img src="static/images/q2/sdinp/HICO_test2015_00000024_39.jpg" alt="SD Inpaint" style="width:100%;border-radius:4px;">
+      <img src="static/images/q2/our/HICO_test2015_00000024_39.jpg" alt="Ours" style="width:100%;border-radius:4px;border:2px solid #23d160;">
+    </div>
+    <p class="interaction-tag" style="margin-bottom:10px;">'wield' ↔ 'baseball bat'</p>
+
+    <!-- Row 2: ride, skateboard -->
+    <div style="display:grid;grid-template-columns:2fr 2fr 2fr 2fr;gap:6px;margin-bottom:4px;">
+      <img src="static/images/q2/target/HICO_test2015_00000060.jpg" alt="Input" style="width:100%;border-radius:4px;">
+      <img src="static/images/q2/pbe/HICO_test2015_00000060_96.jpg" alt="PBE" style="width:100%;border-radius:4px;">
+      <img src="static/images/q2/sdinp/HICO_test2015_00000060_96.jpg" alt="SD Inpaint" style="width:100%;border-radius:4px;">
+      <img src="static/images/q2/our/HICO_test2015_00000060_96.jpg" alt="Ours" style="width:100%;border-radius:4px;border:2px solid #23d160;">
+    </div>
+    <p class="interaction-tag" style="margin-bottom:10px;">'ride' ↔ 'skateboard'</p>
+
+    <!-- Row 3: hold, cup -->
+    <div style="display:grid;grid-template-columns:2fr 2fr 2fr 2fr;gap:6px;margin-bottom:4px;">
+      <img src="static/images/q2/target/HICO_test2015_00000067.jpg" alt="Input" style="width:100%;border-radius:4px;">
+      <img src="static/images/q2/pbe/HICO_test2015_00000067_108.jpg" alt="PBE" style="width:100%;border-radius:4px;">
+      <img src="static/images/q2/sdinp/HICO_test2015_00000067_108.jpg" alt="SD Inpaint" style="width:100%;border-radius:4px;">
+      <img src="static/images/q2/our/HICO_test2015_00000067_108.jpg" alt="Ours" style="width:100%;border-radius:4px;border:2px solid #23d160;">
+    </div>
+    <p class="interaction-tag" style="margin-bottom:10px;">'hold' ↔ 'cup'</p>
+
+    <!-- Row 4: carry, surfboard -->
+    <div style="display:grid;grid-template-columns:2fr 2fr 2fr 2fr;gap:6px;margin-bottom:4px;">
+      <img src="static/images/q2/target/HICO_test2015_00000076.jpg" alt="Input" style="width:100%;border-radius:4px;">
+      <img src="static/images/q2/pbe/HICO_test2015_00000076_131.jpg" alt="PBE" style="width:100%;border-radius:4px;">
+      <img src="static/images/q2/sdinp/HICO_test2015_00000076_131.jpg" alt="SD Inpaint" style="width:100%;border-radius:4px;">
+      <img src="static/images/q2/our/HICO_test2015_00000076_131.jpg" alt="Ours" style="width:100%;border-radius:4px;border:2px solid #23d160;">
+    </div>
+    <p class="interaction-tag" style="margin-bottom:10px;">'carry' ↔ 'surfboard'</p>
+
+    <p class="is-size-7 has-text-grey" style="margin-top:1rem;">
+      GeCHO consistently generates objects that align with the subject's posture, scale, and the scene's depth cues.
+      SD Inpaint often defaults to background continuation; Paint-By-Example struggles with larger masks.
+    </p>
+  </div>
+</section>
+
+<hr class="section-divider">
+
+
+<!-- ══════════════════════════════════════════════
+     QUALITATIVE RESULTS — EDITING COMPARISON
+══════════════════════════════════════════════ -->
+<section class="section">
+  <div class="container is-max-desktop">
+    <h2 class="title is-3 section-heading">Results: Editing Method Comparison</h2>
+    <p class="is-size-6" style="margin-bottom:1.5rem;">
+      We compare against <strong>Add-SD</strong>, a state-of-the-art instruction-based object addition method
+      trained on paired image datasets. For each scene we show one representative generation per method.
+      The red mask indicates the inpainting region used by GeCHO; Add-SD operates on the full image.
+    </p>
+
+    <!-- Column headers -->
+    <div style="display:grid;grid-template-columns:1.5fr 1.5fr 1.5fr 1.5fr;gap:6px;margin-bottom:6px;">
+      <div class="col-header">Input (masked)</div>
+      <div class="col-header">Input (original)</div>
+      <div class="col-header">Add-SD</div>
+      <div class="col-header ours-header">GeCHO (Ours)</div>
+    </div>
+
+    <!-- Row 1: ride skateboard -->
+    <div style="display:grid;grid-template-columns:1.5fr 1.5fr 1.5fr 1.5fr;gap:6px;margin-bottom:4px;">
+      <img src="static/images/q1/target/HICO_test2015_00008606_masked.png" alt="masked input" style="width:100%;border-radius:4px;">
+      <img src="static/images/q1/target/HICO_test2015_00008606.jpg" alt="original" style="width:100%;border-radius:4px;">
+      <img src="static/images/q1/addsd/HICO_test2015_00008606_16230.jpg" alt="Add-SD" style="width:100%;border-radius:4px;">
+      <img src="static/images/q1/our/HICO_test2015_00008606_16230.jpg" alt="Ours" style="width:100%;border-radius:4px;border:2px solid #23d160;">
+    </div>
+    <p class="interaction-tag" style="margin-bottom:10px;">'ride' ↔ 'skateboard'</p>
+
+    <!-- Row 2: jump bicycle -->
+    <div style="display:grid;grid-template-columns:1.5fr 1.5fr 1.5fr 1.5fr;gap:6px;margin-bottom:4px;">
+      <img src="static/images/q1/target/HICO_test2015_00008576_masked.png" alt="masked input" style="width:100%;border-radius:4px;">
+      <img src="static/images/q1/target/HICO_test2015_00008576.jpg" alt="original" style="width:100%;border-radius:4px;">
+      <img src="static/images/q1/addsd/HICO_test2015_00008576_16154.jpg" alt="Add-SD" style="width:100%;border-radius:4px;">
+      <img src="static/images/q1/our/HICO_test2015_00008576_16154.jpg" alt="Ours" style="width:100%;border-radius:4px;border:2px solid #23d160;">
+    </div>
+    <p class="interaction-tag" style="margin-bottom:10px;">'jump' ↔ 'bicycle'</p>
+
+    <!-- Row 3: hold laptop -->
+    <div style="display:grid;grid-template-columns:1.5fr 1.5fr 1.5fr 1.5fr;gap:6px;margin-bottom:4px;">
+      <img src="static/images/q1/target/HICO_test2015_00004265_masked.png" alt="masked input" style="width:100%;border-radius:4px;">
+      <img src="static/images/q1/target/HICO_test2015_00004265.jpg" alt="original" style="width:100%;border-radius:4px;">
+      <img src="static/images/q1/addsd/HICO_test2015_00004265_7642.jpg" alt="Add-SD" style="width:100%;border-radius:4px;">
+      <img src="static/images/q1/our/HICO_test2015_00004265_7642.jpg" alt="Ours" style="width:100%;border-radius:4px;border:2px solid #23d160;">
+    </div>
+    <p class="interaction-tag" style="margin-bottom:10px;">'hold' ↔ 'laptop'</p>
+
+    <p class="is-size-7 has-text-grey" style="margin-top:1rem;">
+      GeCHO produces more diverse and interaction-faithful outputs. Add-SD can place objects plausibly but
+      struggles to synthesize the intended <em>action</em>.
+    </p>
+  </div>
+</section>
+
+<hr class="section-divider">
+
+
+<!-- ══════════════════════════════════════════════
+     QUANTITATIVE RESULTS
+══════════════════════════════════════════════ -->
+<section class="section hero is-light">
+  <div class="container is-max-desktop">
+    <h2 class="title is-3 section-heading">Quantitative Results</h2>
+    <p class="is-size-6" style="margin-bottom:1.2rem;">
+      We evaluate using CLIP-based metrics: <em>CLIP<sub>text</sub></em> distance (lower is better),
+      zero-shot action recognition (ZS Action Acc@1/5), and zero-shot object detection (ZS Obj Acc@1/5).
+    </p>
+
+    <!-- Table 1 -->
+    <h3 class="title is-5" style="margin-bottom:0.8rem;">vs. Inpainting Methods</h3>
+    <div class="table-container" style="margin-bottom:2rem;">
+      <table class="table is-fullwidth is-striped is-hoverable quant-table">
+        <thead>
+          <tr>
+            <th>Method</th>
+            <th>CLIP<sub>text</sub> ↓</th>
+            <th>ZS Action Acc@1 ↑</th>
+            <th>ZS Action Acc@5 ↑</th>
+            <th>ZS Obj Acc@1 ↑</th>
+            <th>ZS Obj Acc@5 ↑</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Paint-By-Example</td>
+            <td>0.7143</td>
+            <td>19.98%</td>
+            <td>75.70%</td>
+            <td>74.72%</td>
+            <td>91.73%</td>
+          </tr>
+          <tr>
+            <td>SD Inpaint</td>
+            <td>0.6757</td>
+            <td>25.87%</td>
+            <td>81.30%</td>
+            <td>79.40%</td>
+            <td>91.34%</td>
+          </tr>
+          <tr class="ours-row">
+            <td><strong>GeCHO (Ours)</strong></td>
+            <td class="best">0.6747</td>
+            <td class="best">26.12%</td>
+            <td class="best">81.85%</td>
+            <td class="best">83.33%</td>
+            <td class="best">93.79%</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Table 2 -->
+    <h3 class="title is-5" style="margin-bottom:0.8rem;">vs. Editing Methods</h3>
+    <div class="table-container">
+      <table class="table is-fullwidth is-striped is-hoverable quant-table">
+        <thead>
+          <tr>
+            <th>Method</th>
+            <th>CLIP<sub>text</sub> ↓</th>
+            <th>ZS Action Acc@1 ↑</th>
+            <th>ZS Action Acc@5 ↑</th>
+            <th>ZS Obj Acc@1 ↑</th>
+            <th>ZS Obj Acc@5 ↑</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>LaMa removed objects</td>
+            <td>0.7110</td>
+            <td>25.15%</td>
+            <td>81.81%</td>
+            <td>49.28%</td>
+            <td>76.90%</td>
+          </tr>
+          <tr>
+            <td>MGIE</td>
+            <td>0.7138</td>
+            <td>24.94%</td>
+            <td>82.14%</td>
+            <td>51.19%</td>
+            <td>79.30%</td>
+          </tr>
+          <tr>
+            <td>MagicBrush</td>
+            <td>0.7074</td>
+            <td>26.56%</td>
+            <td>80.75%</td>
+            <td>52.93%</td>
+            <td>80.48%</td>
+          </tr>
+          <tr>
+            <td>InstructPix2Pix</td>
+            <td>0.7040</td>
+            <td>26.89%</td>
+            <td>83.58%</td>
+            <td>78.79%</td>
+            <td>91.73%</td>
+          </tr>
+          <tr>
+            <td>Add-SD</td>
+            <td>0.6810</td>
+            <td>28.14%</td>
+            <td>83.55%</td>
+            <td><strong>86.37%</strong></td>
+            <td><strong>95.44%</strong></td>
+          </tr>
+          <tr class="ours-row">
+            <td><strong>GeCHO (Ours)</strong></td>
+            <td class="best">0.6574</td>
+            <td class="best">35.50%</td>
+            <td class="best">86.12%</td>
+            <td>84.95%</td>
+            <td>94.60%</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="is-size-7 has-text-grey">
+      GeCHO achieves <strong>+7.36 percentage points</strong> over Add-SD on zero-shot action recognition Acc@1,
+      confirming our approach synthesizes coherent <em>interactions</em>, not just isolated objects.
+    </p>
+  </div>
+</section>
+
+<hr class="section-divider">
+
+
+<!-- ══════════════════════════════════════════════
+     DOWNSTREAM: HOI DETECTION
+══════════════════════════════════════════════ -->
+<section class="section">
+  <div class="container is-max-desktop">
+    <h2 class="title is-3 section-heading">Downstream Task: HOI Detection</h2>
+
+    <div class="columns">
+      <div class="column is-half">
+        <p class="is-size-6" style="margin-bottom:1rem;">
+          We validate GeCHO as a synthetic data generator for <strong>HOI detection</strong>, tackling the severe
+          long-tail distribution in HICO-DET (343 out of 600 categories have fewer than 50 training images).
+          Using GeCHO we synthesize <strong>76,929 images</strong> — 2× the original training set — with an
+          acceptance rate of 69% under uniform sampling (17 valid images/min on a single RTX A6000).
+        </p>
+        <p class="is-size-6">
+          We train <strong>GEN-VLKT</strong> under three configurations: real-only, synthetic pre-training +
+          real fine-tuning, and joint synthetic+real training.
+          <strong>Pre-training with GeCHO data consistently improves mAP</strong>, especially on rare categories
+          (+1.40 mAP<sub>rare</sub> in the Known-Object setting), demonstrating the value of our generated data
+          for learning interaction representations.
+        </p>
+      </div>
+      <div class="column is-half">
+        <figure class="image">
+          <img src="static/images/hoi_pipeline.png" alt="HOI downstream pipeline"
+               style="border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.1);">
+        </figure>
+        <p class="is-size-7 has-text-grey has-text-centered" style="margin-top:0.5rem;">
+          Data synthesis with GeCHO + GroundedSAM filtering → GEN-VLKT training.
+        </p>
+      </div>
+    </div>
+
+    <!-- Distribution figure -->
+    <figure class="image" style="max-width:600px;margin:1.5rem auto;">
+      <img src="static/images/distribution.png" alt="HOI triplet distribution"
+           style="border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.1);">
+    </figure>
+    <p class="is-size-7 has-text-grey has-text-centered" style="margin-top:-0.5rem;margin-bottom:1.5rem;">
+      Distribution of HOI triplets in HICO-DET (blue) and our synthetic complement (red).
+      Our inverse-proportional sampling boosts the under-represented tail categories.
+    </p>
+
+    <!-- HOI results table -->
+    <div class="table-container">
+      <table class="table is-fullwidth is-striped is-hoverable quant-table">
+        <thead>
+          <tr>
+            <th colspan="2">Training strategy</th>
+            <th>mAP<sub>full</sub> (DEF) ↑</th>
+            <th>mAP<sub>rare</sub> (DEF) ↑</th>
+            <th>mAP<sub>full</sub> (KO) ↑</th>
+            <th>mAP<sub>rare</sub> (KO) ↑</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td colspan="2">Real only (baseline)</td>
+            <td>33.60</td>
+            <td>28.94</td>
+            <td>36.65</td>
+            <td>32.48</td>
+          </tr>
+          <tr>
+            <td rowspan="2" style="vertical-align:middle;font-weight:700;color:#23d160;">GeCHO</td>
+            <td><strong>Synth pre-train + real fine-tune</strong></td>
+            <td class="best">33.86</td>
+            <td class="best">30.34</td>
+            <td class="best">36.99</td>
+            <td class="best">33.76</td>
+          </tr>
+          <tr class="ours-row">
+            <td>Synth+real joint training</td>
+            <td>32.64</td>
+            <td>27.86</td>
+            <td>35.94</td>
+            <td>31.01</td>
+          </tr>
+          <tr>
+            <td rowspan="2" style="vertical-align:middle;font-weight:600;color:#888;">SD3</td>
+            <td>Synth pre-train + real fine-tune</td>
+            <td>32.72</td>
+            <td>27.84</td>
+            <td>35.91</td>
+            <td>30.99</td>
+          </tr>
+          <tr>
+            <td>Synth+real joint training</td>
+            <td>30.59</td>
+            <td>26.73</td>
+            <td>34.17</td>
+            <td>31.09</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="is-size-7 has-text-grey">
+      DEF = Default setting (all test images); KO = Known-Object (only images containing the target object).
+      GeCHO pre-training outperforms both the real-only baseline and SD3-based augmentation, particularly on
+      rare interaction categories.
+    </p>
+  </div>
+</section>
+
+<hr class="section-divider">
+
+
+<!-- ══════════════════════════════════════════════
+     ABLATION
+══════════════════════════════════════════════ -->
+<section class="section hero is-light">
+  <div class="container is-max-desktop">
+    <h2 class="title is-3 section-heading">Ablation Studies</h2>
+
+    <h3 class="title is-5">Component Ablation</h3>
+    <p class="is-size-6" style="margin-bottom:1.2rem;">
+      We ablate the two main components of our pipeline: the ControlNet and the LoRA fine-tuning step.
+    </p>
+
+    <!-- Ablation grid headers -->
+    <div style="display:grid;grid-template-columns:2fr 2fr 2fr;gap:6px;margin-bottom:6px;">
+      <div class="col-header">w/o ControlNet & Fine-Tuning</div>
+      <div class="col-header">w/ ControlNet only (w/o fine-tune)</div>
+      <div class="col-header ours-header">Full GeCHO (Ours)</div>
+    </div>
+
+    <!-- Row 1: eating dining table -->
+    <div style="display:grid;grid-template-columns:2fr 2fr 2fr;gap:6px;margin-bottom:4px;">
+      <img src="static/images/a1/base/HICO_train2015_00000588_986.jpg" style="width:100%;border-radius:4px;">
+      <img src="static/images/a1/no_lora/HICO_train2015_00000588_986.jpg" style="width:100%;border-radius:4px;">
+      <img src="static/images/a1/full/HICO_train2015_00000588_986.jpg" style="width:100%;border-radius:4px;border:2px solid #23d160;">
+    </div>
+    <p class="interaction-tag" style="margin-bottom:10px;">'eat' ↔ 'dining table'</p>
+
+    <!-- Row 2: hold potted plant -->
+    <div style="display:grid;grid-template-columns:2fr 2fr 2fr;gap:6px;margin-bottom:4px;">
+      <img src="static/images/a1/base/HICO_train2015_00000597_1002.jpg" style="width:100%;border-radius:4px;">
+      <img src="static/images/a1/no_lora/HICO_train2015_00000597_1002.jpg" style="width:100%;border-radius:4px;">
+      <img src="static/images/a1/full/HICO_train2015_00000597_1002.jpg" style="width:100%;border-radius:4px;border:2px solid #23d160;">
+    </div>
+    <p class="interaction-tag" style="margin-bottom:10px;">'hold' ↔ 'potted plant'</p>
+
+    <!-- Row 3: kiss horse -->
+    <div style="display:grid;grid-template-columns:2fr 2fr 2fr;gap:6px;margin-bottom:4px;">
+      <img src="static/images/a1/base/HICO_train2015_00000661_1115.jpg" style="width:100%;border-radius:4px;">
+      <img src="static/images/a1/no_lora/HICO_train2015_00000661_1115.jpg" style="width:100%;border-radius:4px;">
+      <img src="static/images/a1/full/HICO_train2015_00000661_1115.jpg" style="width:100%;border-radius:4px;border:2px solid #23d160;">
+    </div>
+    <p class="interaction-tag" style="margin-bottom:10px;">'kiss' ↔ 'horse'</p>
+
+    <!-- Row 4: hold donut -->
+    <div style="display:grid;grid-template-columns:2fr 2fr 2fr;gap:6px;margin-bottom:4px;">
+      <img src="static/images/a1/base/HICO_train2015_00000721_1213.jpg" style="width:100%;border-radius:4px;">
+      <img src="static/images/a1/no_lora/HICO_train2015_00000721_1213.jpg" style="width:100%;border-radius:4px;">
+      <img src="static/images/a1/full/HICO_train2015_00000721_1213.jpg" style="width:100%;border-radius:4px;border:2px solid #23d160;">
+    </div>
+    <p class="interaction-tag" style="margin-bottom:10px;">'hold' ↔ 'donut'</p>
+
+    <p class="is-size-7 has-text-grey" style="margin-top:0.5rem;margin-bottom:2rem;">
+      Without ControlNet, the base model often deviates from the intended interaction. Adding ControlNet improves
+      spatial consistency, but artifacts appear where ControlNet activations interact with the U-Net.
+      The LoRA fine-tuning step (Full GeCHO) harmonizes both networks, yielding coherent lighting, poses, and
+      object fidelity.
+    </p>
+
+    <!-- Quantitative ablation table -->
+    <h3 class="title is-5">Mask Configuration Ablation</h3>
+    <p class="is-size-6" style="margin-bottom:1rem;">
+      We compare three strategies for providing <em>M</em><sub>obj</sub> at inference: a fixed user-specified
+      mask, Token-Attention (dynamic mask from full-prompt cross-attention), and Prompt-Attention (dynamic mask
+      from an isolated object-prompt).
+    </p>
+    <div class="table-container">
+      <table class="table is-fullwidth is-striped is-hoverable quant-table">
+        <thead>
+          <tr>
+            <th>M<sub>obj</sub> strategy</th>
+            <th>CLIP<sub>text</sub> ↓</th>
+            <th>ZS Action Acc@1 ↑</th>
+            <th>ZS Action Acc@5 ↑</th>
+            <th>ZS Obj Acc@1 ↑</th>
+            <th>ZS Obj Acc@5 ↑</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Fixed Mask</td>
+            <td>0.6747</td>
+            <td>26.12%</td>
+            <td>81.85%</td>
+            <td>83.33%</td>
+            <td>93.79%</td>
+          </tr>
+          <tr>
+            <td>Token-Attention</td>
+            <td class="best">0.6715</td>
+            <td>27.37%</td>
+            <td>82.73%</td>
+            <td class="best">83.79%</td>
+            <td>93.60%</td>
+          </tr>
+          <tr>
+            <td>Prompt-Attention</td>
+            <td class="best">0.6715</td>
+            <td class="best">27.71%</td>
+            <td class="best">82.83%</td>
+            <td>82.71%</td>
+            <td>92.90%</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="is-size-7 has-text-grey">
+      Dynamic masking improves action accuracy (+1.6 pp) while maintaining object recognition.
+      Token-Attention better preserves spatial relationships; Prompt-Attention allows flexible word selection at
+      the cost of occasional object placement imprecision.
+    </p>
+  </div>
+</section>
+
+<hr class="section-divider">
+
+
+<!-- ══════════════════════════════════════════════
+     AUTHORS
+══════════════════════════════════════════════ -->
+<section class="section">
+  <div class="container is-max-desktop">
+    <h2 class="title is-3 section-heading">Authors</h2>
+    <div class="columns is-multiline is-centered">
+
+      <div class="column is-one-fifth has-text-centered">
+        <div class="author-card">
+          <img src="static/images/bio/minelli.jpg" alt="Giovanni Minelli">
+          <p class="author-name"><a href="https://github.com/johnMinelli" target="_blank">Giovanni Minelli</a></p>
+          <p class="author-aff">IIT &amp; Univ. of Bologna</p>
+        </div>
+      </div>
+
+      <div class="column is-one-fifth has-text-centered">
+        <div class="author-card">
+          <img src="static/images/bio/benericetti.jpeg" alt="Andrea Benericetti">
+          <p class="author-name">Andrea Benericetti</p>
+          <p class="author-aff">Verizon Connect</p>
+        </div>
+      </div>
+
+      <div class="column is-one-fifth has-text-centered">
+        <div class="author-card">
+          <img src="static/images/bio/taccari.png" alt="Leonardo Taccari">
+          <p class="author-name"><a href="https://leotac.github.io/" target="_blank">Leonardo Taccari</a></p>
+          <p class="author-aff">Verizon Connect</p>
+        </div>
+      </div>
+
+      <div class="column is-one-fifth has-text-centered">
+        <div class="author-card">
+          <img src="static/images/bio/sambo.png" alt="Francesco Sambo">
+          <p class="author-name">Francesco Sambo</p>
+          <p class="author-aff">Verizon Connect</p>
+        </div>
+      </div>
+
+      <div class="column is-one-fifth has-text-centered">
+        <div class="author-card">
+          <img src="static/images/bio/salti.png" alt="Samuele Salti">
+          <p class="author-name"><a href="https://www.unibo.it/sitoweb/samuele.salti" target="_blank">Samuele Salti</a></p>
+          <p class="author-aff">Univ. of Bologna</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<hr class="section-divider">
+
+
+<!-- ══════════════════════════════════════════════
+     BIBTEX
+══════════════════════════════════════════════ -->
+<section class="section" id="BibTeX">
+  <div class="container is-max-desktop content">
+    <h2 class="title is-3 section-heading">BibTeX</h2>
+    <pre><code>@ARTICLE{11456932,
+  author={Minelli, Giovanni and Benericetti, Andrea and Taccari, Leonardo
+          and Sambo, Francesco and Salti, Samuele},
+  journal={IEEE Access},
+  title={GeCHO: Generation of Contextualized Human--Object Interactions},
+  year={2026},
+  volume={14},
+  pages={48872--48886},
+  doi={10.1109/ACCESS.2026.3678513}
+}</code></pre>
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════
+     FOOTER
+══════════════════════════════════════════════ -->
+<footer class="footer">
+  <div class="container">
+    <div class="columns is-centered">
+      <div class="column is-8">
+        <div class="content has-text-centered">
+          <p>
+            Website template adapted from
+            <a href="https://nerfies.github.io" target="_blank">Nerfies</a>
+            (licensed
+            <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/" target="_blank">CC BY-SA 4.0</a>).
+            Source code on <a href="https://github.com/johnMinelli/ContextualInpaint" target="_blank">GitHub</a>.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

@@ -1,4 +1,4 @@
-﻿# Contextual Inpainting
+﻿# Generation of Contextualized Human–Object Interactions
 
 Implementation of generative inpainting methods adopted for contextual inpainting of images. The approach is subsequently  tested quantitatively by generating a synthetic dataset for Human-Object Interaction (HOI).
 
@@ -95,3 +95,17 @@ python generate_hoi.py --pretrained_model_name_or_path=stabilityai/stable-diffus
   - `dynamic_masking=False`
   - `aux_focus_prompt=batch["ctrl_txt"], dynamic_masking=True` 
   - `aux_focus_token=[HAND_TOKEN], dynamic_masking=True`
+
+## Cite
+```bibtex
+@article{11456932,
+  author={Minelli, Giovanni and Benericetti, Andrea and Taccari, Leonardo and Sambo, Francesco and Salti, Samuele},
+  journal={IEEE Access}, 
+  title={GeCHO: Generation of Contextualized Human–Object Interactions}, 
+  year={2026},
+  volume={14},
+  number={},
+  pages={48872-48886},
+  keywords={Diffusion models;Training;Synthetic data;Image synthesis;Noise reduction;Diffusion processes;Computational modeling;Visualization;Videos;Semantics;Diffusion;human-object interaction;inpainting},
+  doi={10.1109/ACCESS.2026.3678513}}
+```
